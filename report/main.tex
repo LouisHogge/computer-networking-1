@@ -1,0 +1,110 @@
+\documentclass[a4paper, 11pt]{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage[french]{babel}
+\usepackage{graphicx} 
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{amsmath} 
+\usepackage{amsfonts}
+\usepackage{hyperref}
+\usepackage{array,booktabs,makecell,multirow}
+\usepackage{siunitx}
+\usepackage[left=2cm, right=2cm, bottom=2cm, top=2cm]{geometry}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{pifont}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\begin{document}
+
+\begin{titlepage}
+
+\begin{center}
+\includegraphics[scale = 0.35]{logo.jpg}\\
+\vspace{1cm}
+\textsc{\huge University of Liège}\\[1.2cm]
+\HRule \\[1cm]
+\textsc{\LARGE Introduction to computer networking (INFO0010-4) }\\[1cm]
+{\Huge \bfseries First part of the assignment}\\[1.4cm] 
+\HRule \\[1cm]
+\end{center}
+
+\begin{minipage}{0.45\linewidth}
+      \begin{flushleft} \large
+        \emph{Author : } \\
+        Louis \textsc{Hogge}  s192814
+      \end{flushleft}
+\end{minipage}
+\hfill
+\begin{minipage}{0.45\linewidth}
+      \begin{flushright} \large
+        \emph{Professor : } G. \textsc{Leduc}\\
+        \emph{Assistant : } M. \textsc{Aerts}\\
+        \emph{Year : } 2022-2023 
+      \end{flushright}
+\end{minipage}
+
+\end{titlepage}
+
+\newpage
+
+\section{Software architecture}
+I have broken down the problem in 5 classes, each one responsible for a specific part of the work:
+\begin{enumerate}
+    \item \textbf{Client.java:}\\ The main class responsible for initiating a new TCP connection with a Socket, setting a time out of 5 seconds, writing the question to stdout in the requested format, creating the message by calling the classes and methods in charge, sending a query in the form of a byte array, retrieving the response length as described in RFC 1035 (4.2.2 TCP usage) and the full response, managing the answer by calling the classes and methods in charge and finally closing input and output streams and socket.
+    
+    \item \textbf{Message.java:}\\ A class responsible for handling message objects that contains 2 methods:
+        \begin{enumerate}
+            \item \textbf{\textit{public byte[] writeMessage():}}\\ Constructs a message byte array by creating header and question thanks to a call to the classes and methods in charge, calculates the length of the message and concatenates it with the header and the question.
+
+            \item \textbf{\textit{public byte[] readMessage():}}\\ Separates the answer byte array in 3 parts: header, question and resource records byte arrays. Dispatches these parts to the classes and methods in charge to handle them.
+        \end{enumerate}
+
+    \item \textbf{Header.java:}\\ A class responsible for handling the header part of a message that contains 2 methods:
+        \begin{enumerate}
+            \item \textbf{\textit{public byte[] writeHeader():}}\\ Creates a header byte array by concatenating the right bits/bytes in order to have all the required components : ID, flags, QDCOUNT, ANCOUNT, NSCOUNT and ARCOUNT.
+
+            \item \textbf{\textit{public short readHeader(ByteBuffer):}}\\ Reads a header byte array and verifies if the ID of the response and the ID of the question match and if some answers have been received.
+        \end{enumerate}
+
+    \item \textbf{Question.java:}\\ A class responsible for handling the question part of a message that contains 2 methods:
+        \begin{enumerate}
+            \item \textbf{\textit{public byte[] writeQuestion():}}\\ Creates a question byte array by concatenating the right bits/bytes in order to have all the required components : QNAME, QTYPE and QCLASS. For QCLASS, it splits the domain name in parts delimited by the dots and converts each of these parts into byte arrays. For QTYPE, it matches the question type argument to the right type value.
+
+            \item \textbf{\textit{public void readQuestion(ByteBuffer):}}\\ Reads a question byte array.
+        \end{enumerate}
+
+    \item \textbf{ResourceRecord.java:}\\ A class responsible for handling the resource records part of a message that contains 3 methods:
+        \begin{enumerate}
+            \item \textbf{\textit{public void readResourceRecord(byte[], short):}}\\ Reads a resource records byte array, handles the domain name compression associated with TCP protocol and prints the answers to stdout by calling the methods in charge.
+            
+            \item \textbf{\textit{private void readOffset(byte[], ByteBuffer, byte, byte):}}\\ Handles the domain name compression associated with TCP protocol by recognising pointers and labels thanks to the 11 or 00 first bits, in the case of a pointer, by calculating the offset from the start of the message (i.e. the first octet of the ID field in the domain header) to find domain name parts and by concatenating the latter.
+            
+            \item \textbf{\textit{private void manageRDATA(short, short, int, int):}}\\ Manages RDATA by recognising type and class answers and by adapting method accordingly, then, by printing answers to stdout in the requested format. For type A with class IN, RDATA is a 32 bit Internet address so it must get the different domain name parts, translate them to String and concatenate them together separated by dots. For type TXT with class IN, RDATA is one or more character strings, each of these preceded by an octet containing its length. So it must get the bytes of the character strings, translate them to String and concatenate them together. For other types and classes, RDATA is thrown away and no answer is printed to stdout.
+        \end{enumerate}
+        
+\end{enumerate}
+
+
+\section{Message-oriented communication using a stream}
+The recovery of a message-oriented communication scheme using a stream protocol such as TCP is handled in \textbf{Client.java} thanks to a socket that initiates a new TCP connection, an output stream in charge of sending data to an internet address and an input stream which job is to read data from an internet address. The input stream retrieves the response length written in 2 bytes, as described in RFC 1035 (4.2.2 TCP usage), then converts bytes to length (data sent over the network is always big-endian) and finally retrieves the full response written in a number of bytes corresponding to the calculated length. This full response must then be parsed following a strict procedure where each bytes has a specific job. That is done in \textbf{Message.java}, \textbf{Header.java}, \textbf{Question.java} and \textbf{ResourceRecord.java}.
+
+\section{Limits \& Possible Improvements}
+
+\begin{itemize}
+    \item The only question and answer types allowed are A and TXT. To be complete I would have to add the possibility to send questions and receive/parse answers of all the other types which are : NS, MD, MF, CNAME, SOA, MB, MG, MR, NULL, WKS, PTR, HINFO, MINFO and MX.
+    
+    \item The class used in questions and answers is always IN. To be complete I would have to add the possibility to send questions and receive/parse answers of all the other types which are : CS, CH and HS.
+
+    \item Additional records are outside the scope of this project. To be complete I would have to add the possibility to handle the latter.
+
+    \item Resource records in the authority records section are not handled. To be complete I would have to add the possibility to handle the latter.
+
+    \item If sending the question or receiving the response does not work, the program stops. Setting up a retry system could be interesting.
+    
+\end{itemize}
+
+\end{document}
